@@ -1,0 +1,171 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORCADO - Global Intelligence</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#212121;color:white;font-family:Arial,sans-serif}
+header{height:60px;padding:15px 18px;background:#171717;
+display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:21px;font-weight:bold;letter-spacing:2px}
+button{cursor:pointer;border:0;border-radius:10px;padding:11px 15px}
+.settings{background:#333;color:white}
+main{max-width:850px;margin:auto;padding:20px 15px 130px}
+.welcome{text-align:center;margin:15vh 0 35px}
+.welcome h1{font-size:30px}
+#chat{display:flex;flex-direction:column;gap:22px}
+.message{padding:14px 16px;border-radius:14px;
+white-space:pre-wrap;line-height:1.6;overflow-wrap:anywhere}
+.user{background:#343434;align-self:flex-end;max-width:90%}
+.ai{align-self:stretch;background:#292929}
+.bottom{position:fixed;bottom:0;left:0;right:0;
+background:linear-gradient(transparent,#212121 20%);
+padding:15px}
+.composer{max-width:800px;margin:auto;background:#303030;
+border:1px solid #555;border-radius:18px;padding:10px}
+textarea{width:100%;background:transparent;color:white;
+border:0;outline:0;resize:none;font-size:16px;padding:10px}
+.controls{display:flex;justify-content:space-between;align-items:center}
+.send{background:white;color:black;font-weight:bold}
+.modal{display:none;position:fixed;inset:0;background:#000b;
+align-items:center;justify-content:center;padding:20px}
+.modal-box{background:#292929;padding:22px;border-radius:15px;
+width:100%;max-width:420px}
+input{width:100%;padding:13px;background:#171717;color:white;
+border:1px solid #555;border-radius:9px;margin:10px 0}
+.save{background:white;color:black}
+.small{color:#aaa;font-size:12px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<header>
+<div class="logo">ORCADO ✦</div>
+<button class="settings" onclick="openSettings()">⚙ API KEY</button>
+</header>
+
+<main>
+<div class="welcome" id="welcome">
+<h1>What can I help you with?</h1>
+<p>Welcome to ORCADO Global Intelligence</p>
+</div>
+<div id="chat"></div>
+</main>
+
+<div class="bottom">
+<div class="composer">
+<textarea id="question" rows="2"
+placeholder="Message ORCADO..."></textarea>
+<div class="controls">
+<span class="small" id="status">ORCADO AI</span>
+<button class="send" onclick="sendMessage()">Send ↑</button>
+</div>
+</div>
+</div>
+
+<div class="modal" id="settings">
+<div class="modal-box">
+<h2>API Settings</h2>
+<p>Connect your Google Gemini API key.</p>
+<input id="apiKey" type="password" placeholder="Enter API Key">
+<p class="small">Key is kept in page memory only. Do not publish a real key in public website code. Use a secure backend for deployment.</p>
+<button class="save" onclick="saveKey()">Save Key</button>
+<button onclick="closeSettings()">Cancel</button>
+</div>
+</div>
+
+<script>
+let API_KEY="";
+let history=[];
+
+function openSettings(){
+document.getElementById("settings").style.display="flex";
+}
+function closeSettings(){
+document.getElementById("settings").style.display="none";
+}
+function saveKey(){
+API_KEY=document.getElementById("apiKey").value.trim();
+document.getElementById("status").textContent=
+API_KEY?"API Key Connected":"API Key Missing";
+closeSettings();
+}
+function addMessage(text,type){
+let div=document.createElement("div");
+div.className="message "+type;
+div.textContent=text;
+document.getElementById("chat").appendChild(div);
+window.scrollTo(0,document.body.scrollHeight);
+return div;
+}
+async function sendMessage(){
+let input=document.getElementById("question");
+let question=input.value.trim();
+if(!question)return;
+
+if(!API_KEY){
+openSettings();
+document.getElementById("status").textContent="Enter API Key First";
+return;
+}
+
+document.getElementById("welcome").style.display="none";
+input.value="";
+addMessage(question,"user");
+let answer=addMessage("Thinking...","ai");
+
+document.getElementById("status").textContent="Generating...";
+
+history.push({
+role:"user",
+parts:[{text:question}]
+});
+
+try{
+let response=await fetch(
+"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+encodeURIComponent(API_KEY),
+{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+contents:history,
+generationConfig:{temperature:0.7,maxOutputTokens:2048}
+})
+});
+
+let data=await response.json();
+
+if(!response.ok){
+throw new Error(data.error?.message||"API Error");
+}
+
+let reply=data.candidates?.[0]?.content?.parts
+?.map(p=>p.text||"").join("")||"No answer received.";
+
+answer.textContent=reply;
+
+history.push({
+role:"model",
+parts:[{text:reply}]
+});
+
+document.getElementById("status").textContent="ORCADO AI Connected";
+
+}catch(error){
+answer.textContent="Error: "+error.message;
+history.pop();
+document.getElementById("status").textContent="Connection Failed";
+}
+}
+document.getElementById("question").addEventListener("keydown",e=>{
+if(e.key==="Enter"&&!e.shiftKey){
+e.preventDefault();
+sendMessage();
+}
+});
+</script>
+</body>
+</html>
